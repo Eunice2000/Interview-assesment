@@ -3,6 +3,9 @@ name: Serverless CI/CD Pipeline
 on:
   push:
     branches: [ feature/devops ]
+  pull_request:
+    branches:
+      - feature/devops
 
 env:
   AWS_REGION: us-east-1

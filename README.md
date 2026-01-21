@@ -213,7 +213,3 @@ If stack deletion fails, manually delete:
 - [AWS Lambda Python Guide](https://docs.aws.amazon.com/lambda/latest/dg/python-handler.html)
 - [DynamoDB Best Practices](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/best-practices.html)
 ```
-
-## Deployment Proofs
-
-![Slack deployment notification](docs/images/Netzence-not.png)

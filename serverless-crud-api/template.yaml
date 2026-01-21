@@ -95,9 +95,6 @@ Resources:
         AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
         AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
         AllowOrigin: "'*'"
-      Tags:
-        - Key: Environment
-          Value: !Ref Stage
 
   # CREATE Item Lambda Function
   CreateItemFunction:
@@ -115,11 +112,6 @@ Resources:
             Path: /items
             Method: POST
             RestApiId: !Ref RestApi
-      Tags:
-        - Key: Environment
-          Value: !Ref Stage
-        - Key: Function
-          Value: create-item
 
   # GET Item Lambda Function
   GetItemFunction:
@@ -137,11 +129,6 @@ Resources:
             Path: /items/{itemId}
             Method: GET
             RestApiId: !Ref RestApi
-      Tags:
-        - Key: Environment
-          Value: !Ref Stage
-        - Key: Function
-          Value: get-item
 
   # UPDATE Item Lambda Function
   UpdateItemFunction:
@@ -159,11 +146,6 @@ Resources:
             Path: /items/{itemId}
             Method: PUT
             RestApiId: !Ref RestApi
-      Tags:
-        - Key: Environment
-          Value: !Ref Stage
-        - Key: Function
-          Value: update-item
 
   # DELETE Item Lambda Function
   DeleteItemFunction:
@@ -181,11 +163,6 @@ Resources:
             Path: /items/{itemId}
             Method: DELETE
             RestApiId: !Ref RestApi
-      Tags:
-        - Key: Environment
-          Value: !Ref Stage
-        - Key: Function
-          Value: delete-item
 
   # LIST Items Lambda Function (Bonus)
   ListItemsFunction:
@@ -203,11 +180,6 @@ Resources:
             Path: /items
             Method: GET
             RestApiId: !Ref RestApi
-      Tags:
-        - Key: Environment
-          Value: !Ref Stage
-        - Key: Function
-          Value: list-items
 
 Outputs:
   ApiGatewayUrl:

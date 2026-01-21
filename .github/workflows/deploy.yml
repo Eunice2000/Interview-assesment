@@ -71,3 +71,19 @@ jobs:
             --no-confirm-changeset
           
           echo "Stack deployed/updated successfully"
+
+      # --- SLACK NOTIFICATION ---
+      - name: Notify Slack
+        if: always()
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          channel-id: 'C12345678'  # Replace with your channel ID
+          slack-message: |
+            Serverless API Deployment: ${{ job.status }}
+            Repository: ${{ github.repository }}
+            Branch: ${{ github.ref_name }}
+            Commit: ${{ github.sha }}
+            Stack: ${{ env.STACK_NAME }}
+            Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}

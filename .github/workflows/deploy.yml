@@ -71,6 +71,10 @@ jobs:
             --no-confirm-changeset
           
           echo "Stack deployed/updated successfully"
+          
+      - name: Install test dependencies
+        run: |
+          pip install pytest
 
       # --- AUTOMATED TESTS ---
       - name: Run Automated Tests

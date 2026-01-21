@@ -1,22 +1,224 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: Test SAM Installation
+Description: Serverless CRUD API with DynamoDB
+
+Globals:
+  Function:
+    Timeout: 10
+    MemorySize: 128
+    Runtime: python3.9
+    Tracing: Active
+    Environment:
+      Variables:
+        TABLE_NAME: !Ref ItemsTable
+        STAGE: !Ref Stage
+
+Parameters:
+  Stage:
+    Type: String
+    Default: dev
+    Description: Deployment stage (dev/staging/prod)
+    AllowedValues:
+      - dev
+      - staging
+      - prod
 
 Resources:
-  HelloWorldFunction:
+  # DynamoDB Table
+  ItemsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub items-${Stage}
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: itemId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: itemId
+          KeyType: HASH
+      SSESpecification:
+        SSEEnabled: true
+      Tags:
+        - Key: Environment
+          Value: !Ref Stage
+        - Key: Project
+          Value: Serverless-CRUD-API
+
+  # IAM Role for Lambda with Least Privilege
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub serverless-crud-lambda-role-${Stage}
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: DynamoDBCRUDOperations
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:GetItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:Query
+                  - dynamodb:Scan
+                Resource:
+                  - !GetAtt ItemsTable.Arn
+        - PolicyName: DynamoDBTableOperations
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:DescribeTable
+                Resource:
+                  - !GetAtt ItemsTable.Arn
+      Tags:
+        - Key: Environment
+          Value: !Ref Stage
+
+  # API Gateway REST API
+  RestApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: !Ref Stage
+      Cors:
+        AllowMethods: "'GET,POST,PUT,DELETE,OPTIONS'"
+        AllowHeaders: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+        AllowOrigin: "'*'"
+      Tags:
+        - Key: Environment
+          Value: !Ref Stage
+
+  # CREATE Item Lambda Function
+  CreateItemFunction:
     Type: AWS::Serverless::Function
     Properties:
+      FunctionName: !Sub create-item-${Stage}
+      Description: Create a new item in DynamoDB
       CodeUri: src/functions/create_item/
       Handler: app.lambda_handler
-      Runtime: python3.9
+      Role: !GetAtt LambdaExecutionRole.Arn
       Events:
-        HelloWorld:
+        CreateApi:
           Type: Api
           Properties:
-            Path: /hello
-            Method: get
+            Path: /items
+            Method: POST
+            RestApiId: !Ref RestApi
+      Tags:
+        - Key: Environment
+          Value: !Ref Stage
+        - Key: Function
+          Value: create-item
+
+  # GET Item Lambda Function
+  GetItemFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub get-item-${Stage}
+      Description: Get an item by ID from DynamoDB
+      CodeUri: src/functions/get_item/
+      Handler: app.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Events:
+        GetApi:
+          Type: Api
+          Properties:
+            Path: /items/{itemId}
+            Method: GET
+            RestApiId: !Ref RestApi
+      Tags:
+        - Key: Environment
+          Value: !Ref Stage
+        - Key: Function
+          Value: get-item
+
+  # UPDATE Item Lambda Function
+  UpdateItemFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub update-item-${Stage}
+      Description: Update an existing item in DynamoDB
+      CodeUri: src/functions/update_item/
+      Handler: app.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Events:
+        UpdateApi:
+          Type: Api
+          Properties:
+            Path: /items/{itemId}
+            Method: PUT
+            RestApiId: !Ref RestApi
+      Tags:
+        - Key: Environment
+          Value: !Ref Stage
+        - Key: Function
+          Value: update-item
+
+  # DELETE Item Lambda Function
+  DeleteItemFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub delete-item-${Stage}
+      Description: Delete an item from DynamoDB
+      CodeUri: src/functions/delete_item/
+      Handler: app.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Events:
+        DeleteApi:
+          Type: Api
+          Properties:
+            Path: /items/{itemId}
+            Method: DELETE
+            RestApiId: !Ref RestApi
+      Tags:
+        - Key: Environment
+          Value: !Ref Stage
+        - Key: Function
+          Value: delete-item
+
+  # LIST Items Lambda Function (Bonus)
+  ListItemsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Sub list-items-${Stage}
+      Description: List all items from DynamoDB
+      CodeUri: src/functions/list_items/
+      Handler: app.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Events:
+        ListApi:
+          Type: Api
+          Properties:
+            Path: /items
+            Method: GET
+            RestApiId: !Ref RestApi
+      Tags:
+        - Key: Environment
+          Value: !Ref Stage
+        - Key: Function
+          Value: list-items
 
 Outputs:
-  HelloWorldApi:
+  ApiGatewayUrl:
     Description: "API Gateway endpoint URL"
-    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/hello/"
+    Value: !Sub "https://${RestApi}.execute-api.${AWS::Region}.amazonaws.com/${Stage}/"
+  CreateItemFunctionArn:
+    Description: "Create Item Lambda Function ARN"
+    Value: !GetAtt CreateItemFunction.Arn
+  ItemsTableName:
+    Description: "DynamoDB Table Name"
+    Value: !Ref ItemsTable
+  ItemsTableArn:
+    Description: "DynamoDB Table ARN"
+    Value: !GetAtt ItemsTable.Arn

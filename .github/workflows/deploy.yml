@@ -6,6 +6,7 @@ on:
 
 env:
   AWS_REGION: us-east-1
+  STACK_NAME: serverless-crud-api-staging  # Fixed stack name
 
 jobs:
   code-quality:
@@ -51,24 +52,19 @@ jobs:
           cd serverless-crud-api
           sam build --use-container
 
-      - name: Deploy CI/CD Stack
+      # SINGLE STACK - UPDATED EACH TIME
+      - name: Deploy to Staging
         id: deploy
         run: |
           cd serverless-crud-api
-          # Generate unique timestamp for stack name
-          TIMESTAMP=$(date +%s)
+          
+          echo "Deploying/updating stack: ${{ env.STACK_NAME }}"
+          
           sam deploy \
-            --stack-name serverless-crud-api-cicd-$TIMESTAMP \
+            --stack-name ${{ env.STACK_NAME }} \
             --parameter-overrides Stage=staging \
             --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
             --no-fail-on-empty-changeset \
             --no-confirm-changeset
-
-      # - name: Deploy to Test Environment
-      #   run: |
-      #     sam deploy \
-      #       --stack-name serverless-crud-api-test \
-      #       --parameter-overrides Stage=test \
-      #       --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND \
-      #       --no-fail-on-empty-changeset \
-      #       --no-confirm-changeset
+          
+          echo "✅ Stack deployed/updated successfully"

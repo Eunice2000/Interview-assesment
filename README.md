@@ -1,35 +1,44 @@
-# Interview-assesment
-# Serverless CRUD API
+# CI/CD Pipeline Documentation
 
-A serverless application built with AWS SAM implementing CRUD operations with API Gateway, Lambda, and DynamoDB.
+## Pipeline Overview
+This pipeline automatically builds, deploys, and tests the serverless CRUD API to AWS staging environment.
 
-## Architecture
-- **API Gateway**: REST API endpoints
-- **Lambda Functions**: Python 3.9 functions for CRUD operations
-- **DynamoDB**: NoSQL database for data storage
-- **IAM**: Least-privilege roles for Lambda functions
+## Pipeline Steps
 
-## Endpoints
-- `POST /items` - Create new item
-- `GET /items` - List all items (with optional ?category= filter)
-- `GET /items/{itemId}` - Get item by ID
-- `PUT /items/{itemId}` - Update item
-- `DELETE /items/{itemId}` - Delete item
+### 1. Code Quality
+- **Linting**: Runs `flake8` on Python source code
+- **Location**: `serverless-crud-api/src/`
 
-## Deployment
+### 2. Deployment
+- **Build**: Uses AWS SAM to build Lambda functions
+- **Deploy**: Deploys to CloudFormation stack: `serverless-crud-api-staging`
+- **Strategy**: Updates existing stack (no cleanup needed)
 
-### Prerequisites
-1. AWS CLI configured with credentials
-2. AWS SAM CLI installed
-3. Docker (for local testing)
+### 3. Automated Testing
+- **Integration Tests**: Runs `tests/integration/test_api_gateway.py` if available
+- **Fallback**: Performs basic CRUD operations test
+- **Verification**: Tests all endpoints (Create, Read, Update, Delete)
 
-### One-Command Deployment
+### 4. Rollback Mechanism
+- **Trigger**: Automatically rolls back if tests fail
+- **Method**: Uses CloudFormation rollback capability
+- **Manual**: Fallback to manual rollback if auto-rollback fails
+
+## Required Environment Variables
+
+### GitHub Secrets:
+- `AWS_ACCESS_KEY_ID` - AWS IAM access key
+- `AWS_SECRET_ACCESS_KEY` - AWS IAM secret key
+- `SLACK_BOT_TOKEN` - Slack bot token for notifications
+
+### Pipeline Variables (set in workflow):
+- `AWS_REGION`: us-east-1
+- `STACK_NAME`: serverless-crud-api-staging
+
+## Manual Operations
+
+### Deploy Manually:
 ```bash
-# Deploy to dev environment
-./scripts/deploy.sh dev
-
-# Deploy to staging
-./scripts/deploy.sh staging
-
-# Deploy to production  
-./scripts/deploy.sh prod
+cd serverless-crud-api
+sam build
+sam deploy --stack-name serverless-crud-api-staging --parameter-overrides Stage=staging

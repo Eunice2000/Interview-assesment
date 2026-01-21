@@ -72,6 +72,76 @@ jobs:
           
           echo "Stack deployed/updated successfully"
 
+      # --- AUTOMATED TESTS ---
+      - name: Run Automated Tests
+        id: tests
+        run: |
+          echo "Waiting for API to be ready..."
+          sleep 20
+          
+          # Get API URL from CloudFormation outputs
+          API_URL=$(aws cloudformation describe-stacks \
+            --stack-name ${{ env.STACK_NAME }} \
+            --query "Stacks[0].Outputs[?OutputKey=='ApiGatewayUrl'].OutputValue" \
+            --output text)
+          
+          echo "Testing API at: $API_URL"
+          
+          # Check if integration tests exist
+          if [ -f "serverless-crud-api/tests/integration/test_api_gateway.py" ]; then
+            echo "Running integration tests..."
+            cd serverless-crud-api
+            
+            # Run tests and capture exit code
+            if python -m pytest tests/integration/test_api_gateway.py -v --url="$API_URL"; then
+              echo "All tests passed"
+            else
+              echo "Tests failed"
+              exit 1  # This will trigger the rollback step
+            fi
+            
+          else
+            echo "No integration tests found, running basic smoke test..."
+            
+            # Basic smoke test
+            echo "Testing POST /items..."
+            RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
+              -X POST "${API_URL}items" \
+              -H "Content-Type: application/json" \
+              -d '{"name":"Test Item"}' \
+              --max-time 30)
+            
+            echo "HTTP Status: $RESPONSE"
+            
+            if [[ "$RESPONSE" =~ ^2 ]]; then
+              echo "Smoke test passed"
+            else
+              echo "Smoke test failed with status: $RESPONSE"
+              exit 1  # This will trigger the rollback step
+            fi
+          fi
+
+      # --- ROLLBACK IF TESTS FAIL ---
+      - name: Rollback on Test Failure
+        if: failure() && steps.tests.outcome == 'failure'
+        run: |
+          echo "Tests failed - Initiating rollback..."
+          
+          # Try to rollback using CloudFormation
+          echo "Attempting CloudFormation rollback..."
+          if aws cloudformation rollback-stack \
+            --stack-name ${{ env.STACK_NAME }} \
+            --region ${{ env.AWS_REGION }} 2>/dev/null; then
+            
+            echo "Rollback initiated successfully"
+            echo "Waiting for rollback to complete..."
+            sleep 30
+          else
+            echo "Automatic rollback failed or not supported"
+            echo "Manual rollback required. Run:"
+            echo "aws cloudformation rollback-stack --stack-name ${{ env.STACK_NAME }}"
+          fi
+
       # --- SLACK NOTIFICATION ---
       - name: Notify Slack
         if: always()
@@ -82,8 +152,9 @@ jobs:
             Serverless API Deployment: ${{ job.status }}
             Repository: ${{ github.repository }}
             Branch: ${{ github.ref_name }}
-            Commit: ${{ github.sha }}
             Stack: ${{ env.STACK_NAME }}
+            Tests: ${{ steps.tests.outcome || 'not run' }}
             Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            ${{ job.status == 'failure' && steps.tests.outcome == 'failure' && 'Tests failed - Rollback initiated.' || '' }}
         env:
           SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}

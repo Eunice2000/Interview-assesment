@@ -247,5 +247,5 @@ $RECYCLE.BIN/
 .aws-sam/
 *.zip
 *.tar.gz
-
-.tests/
+# consist of local test files
+.tests/* 

@@ -1,4 +1,3 @@
-```markdown
 # Serverless CRUD API
 
 A serverless CRUD API built with AWS SAM (Serverless Application Model) featuring automated CI/CD pipeline deployment.

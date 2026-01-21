@@ -57,7 +57,7 @@ jobs:
           cd serverless-crud-api
           sam deploy \
             --stack-name serverless-crud-api-test \
-            --parameter-overrides Stage=test \
+            --parameter-overrides Stage=dev \
             --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND \
             --no-fail-on-empty-changeset \
             --no-confirm-changeset

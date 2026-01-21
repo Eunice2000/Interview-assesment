@@ -128,3 +128,27 @@ sam delete --stack-name "serverless-crud-api"
 See the [AWS SAM developer guide](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/what-is-sam.html) for an introduction to SAM specification, the SAM CLI, and serverless application concepts.
 
 Next, you can use AWS Serverless Application Repository to deploy ready to use Apps that go beyond hello world samples and learn how authors developed their applications: [AWS Serverless Application Repository main page](https://aws.amazon.com/serverless/serverlessrepo/)
+# GitHub Secrets Setup for CI/CD
+
+## Required Secrets
+Set these in your GitHub repository:
+1. Go to Settings > Secrets and variables > Actions
+2. Click "New repository secret"
+
+## Secrets to Add:
+1. **AWS_ACCESS_KEY_ID**
+   - Your AWS IAM user access key
+   - Used for deploying to AWS
+
+2. **AWS_SECRET_ACCESS_KEY**
+   - Your AWS IAM user secret key
+   - Used for deploying to AWS
+
+## IAM User Requirements
+The IAM user needs these permissions:
+- CloudFormation:*
+- Lambda:*
+- API Gateway:*
+- DynamoDB:*
+- IAM:PassRole, IAM:CreateRole
+- S3:PutObject (for SAM deployment artifacts)

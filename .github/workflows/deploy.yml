@@ -6,7 +6,7 @@ on:
 
 env:
   AWS_REGION: us-east-1
-  STACK_NAME: serverless-crud-api-staging  # Fixed stack name
+  STACK_NAME: serverless-crud-api-staging  
 
 jobs:
   code-quality:
@@ -67,4 +67,4 @@ jobs:
             --no-fail-on-empty-changeset \
             --no-confirm-changeset
           
-          echo "✅ Stack deployed/updated successfully"
+          echo "Stack deployed/updated successfully"

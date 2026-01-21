@@ -51,14 +51,16 @@ jobs:
           cd serverless-crud-api
           sam build --use-container
 
-      - name: Deploy to Test Environment
+      - name: Deploy with Unique Name
         id: deploy
         run: |
           cd serverless-crud-api
+          # Generate unique suffix
+          UNIQUE_SUFFIX=$(date +%s)
           sam deploy \
-            --stack-name serverless-crud-api-test \
-            --parameter-overrides Stage=dev \
-            --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND \
+            --stack-name serverless-crud-api-cicd-$UNIQUE_SUFFIX \
+            --parameter-overrides Stage=cicd \
+            --capabilities CAPABILITY_IAM \
             --no-fail-on-empty-changeset \
             --no-confirm-changeset
 

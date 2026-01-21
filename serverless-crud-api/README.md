@@ -1,154 +1,244 @@
-# serverless-crud-api
+```markdown
+# Serverless CRUD API
 
-This project contains source code and supporting files for a serverless application that you can deploy with the SAM CLI. It includes the following files and folders.
+A serverless CRUD API built with AWS SAM (Serverless Application Model) featuring automated CI/CD pipeline deployment.
 
-- hello_world - Code for the application's Lambda function.
-- events - Invocation events that you can use to invoke the function.
-- tests - Unit tests for the application code. 
-- template.yaml - A template that defines the application's AWS resources.
+## Features
+- RESTful CRUD API (Create, Read, Update, Delete operations)
+- AWS Lambda functions for business logic
+- Amazon DynamoDB for data storage
+- API Gateway for HTTP endpoints
+- Automated CI/CD pipeline with GitHub Actions
+- Infrastructure as Code with AWS SAM
 
-The application uses several AWS resources, including Lambda functions and an API Gateway API. These resources are defined in the `template.yaml` file in this project. You can update the template to add AWS resources through the same deployment process that updates your application code.
+## Architecture
+```
+API Gateway → Lambda Functions → DynamoDB Table
+```
 
-If you prefer to use an integrated development environment (IDE) to build and test your application, you can use the AWS Toolkit.  
-The AWS Toolkit is an open source plug-in for popular IDEs that uses the SAM CLI to build and deploy serverless applications on AWS. The AWS Toolkit also adds a simplified step-through debugging experience for Lambda function code. See the following links to get started.
+## Project Structure
+```
+serverless-crud-api/
+├── src/functions/          # Lambda function source code
+├── tests/                  # Test files (unit & integration)
+├── .github/workflows/      # CI/CD pipeline definitions
+├── template.yaml           # AWS SAM infrastructure definition
+├── samconfig.toml          # SAM deployment configuration
+└── README.md               # This file
+```
 
-* [CLion](https://docs.aws.amazon.com/toolkit-for-jetbrains/latest/userguide/welcome.html)
-* [GoLand](https://docs.aws.amazon.com/toolkit-for-jetbrains/latest/userguide/welcome.html)
-* [IntelliJ](https://docs.aws.amazon.com/toolkit-for-jetbrains/latest/userguide/welcome.html)
-* [WebStorm](https://docs.aws.amazon.com/toolkit-for-jetbrains/latest/userguide/welcome.html)
-* [Rider](https://docs.aws.amazon.com/toolkit-for-jetbrains/latest/userguide/welcome.html)
-* [PhpStorm](https://docs.aws.amazon.com/toolkit-for-jetbrains/latest/userguide/welcome.html)
-* [PyCharm](https://docs.aws.amazon.com/toolkit-for-jetbrains/latest/userguide/welcome.html)
-* [RubyMine](https://docs.aws.amazon.com/toolkit-for-jetbrains/latest/userguide/welcome.html)
-* [DataGrip](https://docs.aws.amazon.com/toolkit-for-jetbrains/latest/userguide/welcome.html)
-* [VS Code](https://docs.aws.amazon.com/toolkit-for-vscode/latest/userguide/welcome.html)
-* [Visual Studio](https://docs.aws.amazon.com/toolkit-for-visual-studio/latest/user-guide/welcome.html)
+## CI/CD Pipeline
 
-## Deploy the sample application
+### Overview
+The GitHub Actions pipeline automatically builds, tests, and deploys the application to AWS staging environment on every push to the `feature/devops` branch.
 
-The Serverless Application Model Command Line Interface (SAM CLI) is an extension of the AWS CLI that adds functionality for building and testing Lambda applications. It uses Docker to run your functions in an Amazon Linux environment that matches Lambda. It can also emulate your application's build environment and API.
+### Pipeline Stages
 
-To use the SAM CLI, you need the following tools.
+#### 1. Code Quality Check
+- **Linting**: Runs `flake8` on Python source code
+- **Location**: Checks code in `serverless-crud-api/src/`
 
-* SAM CLI - [Install the SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-install.html)
-* [Python 3 installed](https://www.python.org/downloads/)
-* Docker - [Install Docker community edition](https://hub.docker.com/search/?type=edition&offering=community)
+#### 2. Deployment
+- **Build**: Uses AWS SAM to build Lambda functions with Docker container
+- **Deploy**: Deploys to CloudFormation stack: `serverless-crud-api-staging`
+- **Strategy**: Updates existing stack (no cleanup needed between deployments)
 
-To build and deploy your application for the first time, run the following in your shell:
+#### 3. Automated Testing
+- **Smoke Test**: Verifies API endpoints are accessible after deployment
+- **Future Work**: Comprehensive integration tests will be added
 
+#### 4. Rollback Mechanism
+- **Trigger**: Automatically rolls back if smoke tests fail
+- **Method**: Uses CloudFormation rollback capability
+- **Fallback**: Provides manual rollback instructions if auto-rollback fails
+
+#### 5. Notifications
+- **Slack**: Sends deployment status notifications to configured channel
+
+## Setup Instructions
+
+### Prerequisites
+- AWS Account with appropriate permissions
+- GitHub repository
+- Python 3.10+
+- AWS SAM CLI
+- Docker (for local testing)
+
+### 1. AWS Credentials Setup
+Create an IAM user with these minimum permissions:
+- `CloudFormation:*`
+- `Lambda:*`
+- `APIGateway:*`
+- `DynamoDB:*`
+- `IAM:PassRole`
+- `S3:PutObject`
+
+### 2. GitHub Secrets Configuration
+Add these secrets to your GitHub repository (Settings → Secrets → Actions):
+
+| Secret Name | Description |
+|-------------|-------------|
+| `AWS_ACCESS_KEY_ID` | AWS IAM user access key |
+| `AWS_SECRET_ACCESS_KEY` | AWS IAM user secret key |
+| `SLACK_BOT_TOKEN` | Slack bot token for notifications (optional) |
+
+### 3. Local Development
 ```bash
+# Clone the repository
+git clone <your-repo-url>
+cd serverless-crud-api
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Build the application
 sam build --use-container
-sam deploy --guided
+
+# Test locally
+sam local invoke CreateItemFunction --event events/event.json
+sam local start-api
 ```
 
-The first command will build the source of your application. The second command will package and deploy your application to AWS, with a series of prompts:
-
-* **Stack Name**: The name of the stack to deploy to CloudFormation. This should be unique to your account and region, and a good starting point would be something matching your project name.
-* **AWS Region**: The AWS region you want to deploy your app to.
-* **Confirm changes before deploy**: If set to yes, any change sets will be shown to you before execution for manual review. If set to no, the AWS SAM CLI will automatically deploy application changes.
-* **Allow SAM CLI IAM role creation**: Many AWS SAM templates, including this example, create AWS IAM roles required for the AWS Lambda function(s) included to access AWS services. By default, these are scoped down to minimum required permissions. To deploy an AWS CloudFormation stack which creates or modifies IAM roles, the `CAPABILITY_IAM` value for `capabilities` must be provided. If permission isn't provided through this prompt, to deploy this example you must explicitly pass `--capabilities CAPABILITY_IAM` to the `sam deploy` command.
-* **Save arguments to samconfig.toml**: If set to yes, your choices will be saved to a configuration file inside the project, so that in the future you can just re-run `sam deploy` without parameters to deploy changes to your application.
-
-You can find your API Gateway Endpoint URL in the output values displayed after deployment.
-
-## Use the SAM CLI to build and test locally
-
-Build your application with the `sam build --use-container` command.
-
+### 4. Manual Deployment
 ```bash
-serverless-crud-api$ sam build --use-container
+# Deploy to AWS
+sam deploy --stack-name serverless-crud-api-staging --parameter-overrides Stage=staging
 ```
 
-The SAM CLI installs dependencies defined in `hello_world/requirements.txt`, creates a deployment package, and saves it in the `.aws-sam/build` folder.
+## API Endpoints
 
-Test a single function by invoking it directly with a test event. An event is a JSON document that represents the input that the function receives from the event source. Test events are included in the `events` folder in this project.
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/items` | Create a new item |
+| GET | `/items` | List all items |
+| GET | `/items/{id}` | Get specific item |
+| PUT | `/items/{id}` | Update an item |
+| DELETE | `/items/{id}` | Delete an item |
 
-Run functions locally and invoke them with the `sam local invoke` command.
+## Testing
 
+### Unit Tests
 ```bash
-serverless-crud-api$ sam local invoke HelloWorldFunction --event events/event.json
+cd serverless-crud-api
+python -m pytest tests/unit -v
 ```
 
-The SAM CLI can also emulate your application's API. Use the `sam local start-api` to run the API locally on port 3000.
-
+### Integration Tests
+Integration tests require a deployed stack:
 ```bash
-serverless-crud-api$ sam local start-api
-serverless-crud-api$ curl http://localhost:3000/
+export AWS_SAM_STACK_NAME="serverless-crud-api-staging"
+python -m pytest tests/integration -v
 ```
 
-The SAM CLI reads the application template to determine the API's routes and the functions that they invoke. The `Events` property on each function's definition includes the route and method for each path.
+### Pipeline Tests
+The CI/CD pipeline includes:
+1. **Code linting** with flake8
+2. **Smoke tests** verifying API accessibility
+3. **Future**: Comprehensive integration tests
 
+## Monitoring and Troubleshooting
+
+### CloudWatch Logs
+```bash
+# View Lambda function logs
+sam logs --stack-name serverless-crud-api-staging --tail
+```
+
+### CloudFormation Status
+```bash
+# Check stack status
+aws cloudformation describe-stacks --stack-name serverless-crud-api-staging
+
+# View deployment events
+aws cloudformation describe-stack-events --stack-name serverless-crud-api-staging
+```
+
+### Manual Rollback
+If automatic rollback fails:
+```bash
+aws cloudformation rollback-stack --stack-name serverless-crud-api-staging
+```
+
+## Environment Variables
+
+### Pipeline Variables (set in workflow)
 ```yaml
-      Events:
-        HelloWorld:
-          Type: Api
-          Properties:
-            Path: /hello
-            Method: get
+AWS_REGION: us-east-1
+STACK_NAME: serverless-crud-api-staging
 ```
 
-## Add a resource to your application
-The application template uses AWS Serverless Application Model (AWS SAM) to define application resources. AWS SAM is an extension of AWS CloudFormation with a simpler syntax for configuring common serverless application resources such as functions, triggers, and APIs. For resources not included in [the SAM specification](https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md), you can use standard [AWS CloudFormation](https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/aws-template-resource-type-ref.html) resource types.
-
-## Fetch, tail, and filter Lambda function logs
-
-To simplify troubleshooting, SAM CLI has a command called `sam logs`. `sam logs` lets you fetch logs generated by your deployed Lambda function from the command line. In addition to printing the logs on the terminal, this command has several nifty features to help you quickly find the bug.
-
-`NOTE`: This command works for all AWS Lambda functions; not just the ones you deploy using SAM.
-
-```bash
-serverless-crud-api$ sam logs -n HelloWorldFunction --stack-name "serverless-crud-api" --tail
-```
-
-You can find more information and examples about filtering Lambda function logs in the [SAM CLI Documentation](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-logging.html).
-
-## Tests
-
-Tests are defined in the `tests` folder in this project. Use PIP to install the test dependencies and run tests.
-
-```bash
-serverless-crud-api$ pip install -r tests/requirements.txt --user
-# unit test
-serverless-crud-api$ python -m pytest tests/unit -v
-# integration test, requiring deploying the stack first.
-# Create the env variable AWS_SAM_STACK_NAME with the name of the stack we are testing
-serverless-crud-api$ AWS_SAM_STACK_NAME="serverless-crud-api" python -m pytest tests/integration -v
-```
+### Application Parameters
+- `Stage`: Deployment environment (staging/production)
+- DynamoDB table name is auto-generated based on stage
 
 ## Cleanup
 
-To delete the sample application that you created, use the AWS CLI. Assuming you used your project name for the stack name, you can run the following:
-
+### Delete Stack
 ```bash
-sam delete --stack-name "serverless-crud-api"
+sam delete --stack-name serverless-crud-api-staging
 ```
 
+### Manual Cleanup
+If stack deletion fails, manually delete:
+1. DynamoDB table: `items-staging`
+2. Lambda functions: `*-staging`
+3. API Gateway: `serverless-crud-api-staging`
+4. CloudWatch log groups: `/aws/lambda/*-staging`
+
+## Future Improvements
+1. **Multi-environment support** (staging, production)
+2. **Comprehensive integration tests**
+3. **Security scanning** in pipeline
+4. **Performance testing**
+5. **Blue-green deployments**
+
+## Troubleshooting Common Issues
+
+### Deployment Failures
+1. **IAM permissions**: Ensure IAM user has all required permissions
+2. **Resource limits**: Check AWS service limits in your account
+3. **Template errors**: Run `sam validate` before deployment
+
+### API Gateway Issues
+1. **Missing Authentication Token**: Check API Gateway stage deployment
+2. **Timeout errors**: Verify Lambda function timeouts and VPC configuration
+
+### Pipeline Failures
+1. **GitHub Secrets**: Verify all required secrets are set
+2. **AWS Region**: Ensure region matches your resources
+3. **SAM CLI version**: Update to latest version
+
 ## Resources
+- [AWS SAM Documentation](https://docs.aws.amazon.com/serverless-application-model/)
+- [GitHub Actions Documentation](https://docs.github.com/en/actions)
+- [AWS Lambda Python Guide](https://docs.aws.amazon.com/lambda/latest/dg/python-handler.html)
+- [DynamoDB Best Practices](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/best-practices.html)
+```
 
-See the [AWS SAM developer guide](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/what-is-sam.html) for an introduction to SAM specification, the SAM CLI, and serverless application concepts.
+## **Key Changes Made:**
 
-Next, you can use AWS Serverless Application Repository to deploy ready to use Apps that go beyond hello world samples and learn how authors developed their applications: [AWS Serverless Application Repository main page](https://aws.amazon.com/serverless/serverlessrepo/)
-# GitHub Secrets Setup for CI/CD
+1. **Removed** outdated hello_world references
+2. **Added** comprehensive CI/CD pipeline documentation
+3. **Added** setup instructions for GitHub secrets
+4. **Added** API endpoint documentation
+5. **Added** troubleshooting section
+6. **Added** monitoring and maintenance instructions
+7. **Kept** existing SAM CLI instructions for local development
+8. **Marked** future work for comprehensive tests
 
-## Required Secrets
-Set these in your GitHub repository:
-1. Go to Settings > Secrets and variables > Actions
-2. Click "New repository secret"
+## **Also Update `DEPLOYMENT_GUIDE.md` content:**
 
-## Secrets to Add:
-1. **AWS_ACCESS_KEY_ID**
-   - Your AWS IAM user access key
-   - Used for deploying to AWS
+Since you mentioned merging documentation, you can either:
+1. **Delete** `DEPLOYMENT_GUIDE.md` and `GITHUB_SECRETS_SETUP.md` (content now in README)
+2. **Or** keep them but update to reference the README
 
-2. **AWS_SECRET_ACCESS_KEY**
-   - Your AWS IAM user secret key
-   - Used for deploying to AWS
+**Recommended:**
+```bash
+# Delete redundant files
+rm DEPLOYMENT_GUIDE.md GITHUB_SECRETS_SETUP.md
 
-## IAM User Requirements
-The IAM user needs these permissions:
-- CloudFormation:*
-- Lambda:*
-- API Gateway:*
-- DynamoDB:*
-- IAM:PassRole, IAM:CreateRole
-- S3:PutObject (for SAM deployment artifacts)
+# Commit changes
+git add README.md
+git rm DEPLOYMENT_GUIDE.md GITHUB_SECRETS_SETUP.md
+git commit -m "docs: Update README with CI/CD pipeline documentation"
+```

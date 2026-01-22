@@ -1,4 +1,3 @@
-# Interview-assesment
 # Serverless CRUD API
 
 A serverless application built with AWS SAM implementing CRUD operations with API Gateway, Lambda, and DynamoDB.

@@ -2,7 +2,14 @@ name: Serverless CI/CD Pipeline
 
 on:
   push:
-    branches: [ main ]
+    branches: [ feature/devops ]
+  pull_request:
+    branches:
+      - feature/devops
+
+env:
+  AWS_REGION: us-east-1
+  STACK_NAME: serverless-crud-api-staging  
 
 jobs:
   code-quality:
@@ -15,18 +22,19 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.9'
+          python-version: '3.10'
 
       - name: Install flake8
         run: pip install flake8
 
-      - name: Run flake8 linting
+      - name: Run linting
         run: |
+          cd serverless-crud-api
           flake8 src/ --count --exit-zero --max-complexity=10
 
-  deploy:
+  deploy-and-test:
     runs-on: ubuntu-latest
-    needs: code-quality  # Wait for linting to pass
+    needs: code-quality
     
     steps:
       - name: Checkout code
@@ -37,20 +45,118 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
+          aws-region: ${{ env.AWS_REGION }}
 
       - name: Install SAM CLI
         run: pip install aws-sam-cli
 
-      - name: Build with SAM
-        run: sam build
-
-      - name: Deploy to AWS
+      - name: SAM Build with Container
         run: |
-          echo "🚀 Deploying to AWS..."
+          cd serverless-crud-api
+          sam build --use-container
+
+      # SINGLE STACK - UPDATED EACH TIME
+      - name: Deploy to Staging
+        id: deploy
+        run: |
+          cd serverless-crud-api
+          
+          echo "Deploying/updating stack: ${{ env.STACK_NAME }}"
+          
           sam deploy \
-            --stack-name serverless-crud-api-dev \
-            --parameter-overrides Stage=dev \
-            --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM CAPABILITY_AUTO_EXPAND \
+            --stack-name ${{ env.STACK_NAME }} \
+            --parameter-overrides Stage=staging \
+            --capabilities CAPABILITY_IAM CAPABILITY_NAMED_IAM \
             --no-fail-on-empty-changeset \
             --no-confirm-changeset
+          
+          echo "Stack deployed/updated successfully"
+
+      # --- SIMPLE SMOKE TEST ---
+      - name: Run Simple Smoke Test
+        id: tests
+        run: |
+          echo "Waiting for API to be ready..."
+          sleep 15
+          
+          # Get API URL from CloudFormation outputs
+          API_URL=$(aws cloudformation describe-stacks \
+            --stack-name ${{ env.STACK_NAME }} \
+            --query "Stacks[0].Outputs[?OutputKey=='ApiGatewayUrl'].OutputValue" \
+            --output text)
+          
+          echo "Testing API at: $API_URL"
+          
+          # SIMPLE TEST: Just check if the API responds
+          echo "Checking if API endpoint is accessible..."
+          
+          # Try a simple GET request to /items
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X GET "${API_URL}items" \
+            --max-time 30)
+          
+          echo "GET /items returned HTTP status: $HTTP_STATUS"
+          
+          # Accept any 2xx, 3xx, or 4xx status (anything but 5xx or timeout)
+          if [[ "$HTTP_STATUS" =~ ^[234] ]]; then
+            echo "API test passed - Endpoint is responding"
+          else
+            echo "API test failed - Endpoint returned: $HTTP_STATUS"
+            exit 1
+          fi
+          
+          # Optional: Try a POST request if GET worked
+          echo "Testing POST /items..."
+          POST_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X POST "${API_URL}items" \
+            -H "Content-Type: application/json" \
+            -d '{"name":"Test Item"}' \
+            --max-time 30)
+          
+          echo "POST /items returned HTTP status: $POST_STATUS"
+          
+          # For POST, we expect 2xx (success) or 4xx (client error, e.g., validation)
+          if [[ "$POST_STATUS" =~ ^[24] ]]; then
+            echo "POST test completed"
+          else
+            echo "POST test warning - Unexpected status: $POST_STATUS"
+            # Don't fail for POST, just warn
+          fi
+
+      # --- ROLLBACK IF TESTS FAIL ---
+      - name: Rollback on Test Failure
+        if: failure() && steps.tests.outcome == 'failure'
+        run: |
+          echo "Tests failed - Initiating rollback..."
+          
+          # Try to rollback using CloudFormation
+          echo "Attempting CloudFormation rollback..."
+          if aws cloudformation rollback-stack \
+            --stack-name ${{ env.STACK_NAME }} \
+            --region ${{ env.AWS_REGION }} 2>/dev/null; then
+            
+            echo "Rollback initiated successfully"
+            echo "Waiting for rollback to complete..."
+            sleep 30
+          else
+            echo "Automatic rollback failed or not supported"
+            echo "Manual rollback required. Run:"
+            echo "aws cloudformation rollback-stack --stack-name ${{ env.STACK_NAME }}"
+          fi
+
+      # --- SLACK NOTIFICATION ---
+      - name: Notify Slack
+        if: always()
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          channel-id: 'C0AAGPBB9EV'  
+          slack-message: |
+            Serverless API Deployment: ${{ job.status }}
+            Repository: ${{ github.repository }}
+            Branch: ${{ github.ref_name }}
+            Stack: ${{ env.STACK_NAME }}
+            Tests: ${{ steps.tests.outcome || 'not run' }}
+            Run: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            ${{ job.status == 'failure' && steps.tests.outcome == 'failure' && 'Tests failed - Rollback initiated.' || '' }}
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}

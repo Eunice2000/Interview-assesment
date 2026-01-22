@@ -243,3 +243,9 @@ $RECYCLE.BIN/
 
 # End of https://www.gitignore.io/api/osx,linux,python,windows,pycharm,visualstudiocode
 .aws-sam/*
+# AWS SAM
+.aws-sam/
+*.zip
+*.tar.gz
+# consist of local test files
+.tests/* 
